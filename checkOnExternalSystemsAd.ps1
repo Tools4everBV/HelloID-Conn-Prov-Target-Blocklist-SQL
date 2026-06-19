@@ -227,7 +227,7 @@ try {
             Write-Verbose "Queried data from table [$table] for attribute [$($fieldToCheck.Name)] with cross-check. Query: $($querySelect). Returned rows: $selectRowCount"
 
             # Check property uniqueness with retention period logic
-            if (@($querySelectResult).count -gt 0) {
+            if ($selectRowCount -gt 0) {
                 foreach ($dbRow in $querySelectResult) {
                     # Check if the person is using the value themselves (based on correlation attribute)
                     if ($dbRow.($correlationAttribute.systemFieldName) -eq $a.($correlationAttribute.accountFieldName)) {
@@ -288,7 +288,7 @@ try {
                     }
                 }
             }
-            elseif (@($querySelectResult).count -eq 0) {
+            elseif ($selectRowCount -eq 0) {
                 Write-Information "Property [$($fieldToCheck.Name)] with value [$fieldToCheckAccountValue] is unique."
             }
         }

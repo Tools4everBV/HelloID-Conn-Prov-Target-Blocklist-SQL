@@ -2,6 +2,17 @@
 
 All notable changes to this project will be documented in this file. The format is based on [Keep a Changelog](https://keepachangelog.com/), and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [2.0.2] - 2026-04-01
+
+### Changed
+
+- Added explicit correlation attribute validation in `checkOnExternalSystemsAd.ps1` to fail fast when `accountFieldName` is missing, not mapped in the account object, or mapped without a value
+- Expanded correlation attribute guidance in `checkOnExternalSystemsAd.ps1` configuration comments and in the README with an IMPORTANT callout that the correlation field must be mapped for all operations where uniqueness checks are enabled (create, update, etc.)
+
+### Fixed
+
+- Corrected uniqueness result evaluation in `checkOnExternalSystemsAd.ps1` by using `$selectRowCount` instead of `@($querySelectResult).count`, improving reliability for SQL query result counting
+
 ## [2.0.1] - 2026-04-01
 
 ### Changed
