@@ -288,7 +288,7 @@ try {
                     }
                 }
             }
-            elseif (@($querySelectResult).count -eq 0) {
+            elseif ($selectRowCount -eq 0) {
                 Write-Information "Property [$($fieldToCheck.Name)] with value [$fieldToCheckAccountValue] is unique."
             }
         }
