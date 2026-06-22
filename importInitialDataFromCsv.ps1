@@ -12,8 +12,7 @@ param(
 )
 
 # Get configuration from HelloID actionContext
-#$actionContext = $('insert actioncontext in json format here' | ConvertFrom-Json)
-$actionContext = $('{ "Configuration": { "connectionString": "Server=szb-helloid-sqldb-01.privatelink.database.windows.net;Database=HelloID;", "password": "2nykfiC=FVskSp", "table": "blacklist", "username": "HelloID_usr" }, "DryRun": false, "Operation": "undefined", "Data": { "employeeId": "4035584", "Mail": "a.witzel@zorgbalans.nl", "UserPrincipalName": "a.witzel@zorgbalans.nl" }, "CorrelationConfiguration": { "Enabled": false, "PersonField": "Person.ExternalId", "PersonFieldValue": null, "AccountField": "employeeId", "AccountFieldValue": null }, "AccountCorrelated": false, "References": { "Account": null, "ManagerAccount": null }, "Origin": "enforcement" }' | ConvertFrom-Json)
+$actionContext = $('insert actioncontext in json format here' | ConvertFrom-Json)
 
 # Validate parameters
 if (-not (Test-Path $CsvPath)) {
