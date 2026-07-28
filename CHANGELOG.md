@@ -2,6 +2,18 @@
 
 All notable changes to this project will be documented in this file. The format is based on [Keep a Changelog](https://keepachangelog.com/), and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [2.1.0] - 2026-07-28
+
+### Added
+
+- New combined uniqueness check script `checkOnExternalSystemsAdAndSql.ps1` to validate values against both SQL blacklist and Active Directory in one flow, including cross-check support and keep-in-sync behavior.
+- New initial import utility `importInitialDataFromCsv.ps1` for loading blacklist data from CSV, enriching entries via AD lookup, and auto-adding `UserPrincipalName` rows for mail-based input.
+
+### Changed
+
+- Updated SQL table definition in `createTableBlacklist.sql` so `employeeId` allows `NULL`, aligning with import and lookup scenarios where no employee ID is available.
+- Added a filtered index on `employeeId` (`IX_blacklist_2`) to optimize lookups for populated employee IDs while keeping nullable records supported.
+
 ## [2.0.2] - 2026-04-01
 
 ### Changed
