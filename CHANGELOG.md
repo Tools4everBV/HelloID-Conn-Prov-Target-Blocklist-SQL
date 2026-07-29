@@ -8,6 +8,7 @@ All notable changes to this project will be documented in this file. The format 
 
 - New combined uniqueness check script `checkOnExternalSystemsAdAndSql.ps1` to validate values against both SQL blacklist and Active Directory in one flow, including cross-check support and keep-in-sync behavior.
 - New initial import utility `importInitialDataFromCsv.ps1` for loading blacklist data from CSV, enriching entries via AD lookup, and auto-adding `UserPrincipalName` rows for mail-based input.
+- Added separated folders for `CheckOnExternalSystems` and `SupportingFiles` including a separated `README.md`.
 
 ### Changed
 
