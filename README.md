@@ -25,8 +25,6 @@
   - [Development resources](#development-resources)
     - [Available lifecycle actions](#available-lifecycle-actions)
     - [Additional scripts](#additional-scripts)
-      - [Configuring checkOnExternalSystemsAd.ps1](#configuring-checkonexternalsystemsadps1)
-    - [Database table structure](#database-table-structure)
   - [Getting help](#getting-help)
   - [HelloID docs](#helloid-docs)
 
@@ -77,7 +75,7 @@ https://raw.githubusercontent.com/Tools4everBV/HelloID-Conn-Prov-Target-Blacklis
 
 - HelloID Provisioning agent (cloud or on-premises)
 - Available MS SQL Server database (external server or local SQL Express instance)
-- Database table created using the `createTableBlacklist.sql` script
+- Database table created using the `createTableBlacklist.sql` script in `SupportingFiles` folder
 - Database access rights for the agent's service account or SQL-authenticated account
 - The client is responsible for populating the blacklist database with any previous data. HelloID will only manage and add the data for the persons handled by provisioning.
 
@@ -150,92 +148,13 @@ Beyond the standard lifecycle scripts, this connector includes specialized scrip
 
 | Script                                  | Purpose                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
 | --------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `checkOnExternalSystemsAd.ps1`          | **Uniqueness validation script** - Configured in the HelloID built-in Active Directory connector to check if proposed values exist in the blacklist before account creation. Validates against retention period: values are non-unique if owned by another person and within retention period, but can be reused if retention period expired. Includes advanced features: (1) **Self-usage control** - configurable `$allowSelfUsage` to determine if persons can reuse their own values, (2) **Cross-checking** - validate if a value exists under different attribute names (e.g., email as both 'mail' and 'userPrincipalName'), (3) **Field synchronization** - `keepInSyncWith` automatically marks related fields as non-unique. Returns `NonUniqueFields` array to HelloID, preventing provisioning errors before AD account creation attempts. |
-| `createTableBlacklist.sql`              | **Database setup script** - Creates the required SQL table structure with proper column types (NVARCHAR, DATETIME2) and constraints. Must be executed in SQL Server Management Studio or similar tool before using the connector. Sets up the foundation for all blacklist operations.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| `CheckOnExternalSystems/checkOnExternalSystemsAd.ps1` and `CheckOnExternalSystems/checkOnExternalSystemsAdAndSql.ps1` | **Uniqueness validation scripts** - Validate proposed attribute values before provisioning. Full configuration and usage details are documented in `CheckOnExternalSystems/README.md`. |
+| `SupportingFiles/createTableBlacklist.sql` and `SupportingFiles/importInitialDataFromCsv.ps1` | **Database helper files** - SQL table setup and optional initial CSV import tooling. Full setup and usage details are documented in `SupportingFiles/README.md`. |
 | `GenerateUniqueData/example.create.ps1` | **Legacy example script** - Demonstrates how to generate unique values by querying the SQL blacklist database in older PowerShell v1 connectors. While this is legacy code, it can be adapted for scenarios requiring custom unique value generation (e.g., employee numbers, random identifiers). Not required for standard V2 connector operation.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
 
-#### Configuring checkOnExternalSystemsAd.ps1
+For detailed configuration of the uniqueness validation scripts, see `CheckOnExternalSystems/README.md`.
 
-The uniqueness check script includes several configuration options that must be set before use:
-
-> [!IMPORTANT]
-> **Retention Period Synchronization**: The `checkOnExternalSystemsAd.ps1` script requires access to the same database and retention period configuration as the main connector. Configure the script within the target connector (e.g., Active Directory) by passing the same connection settings and `retentionPeriod` value. The retention period must be consistent across both the blacklist connector configuration and the uniqueness check script to ensure accurate validation.
-
-> [!WARNING]
-> **Initial Configuration Required**: Before deploying to production, you must customize the following configurations in `checkOnExternalSystemsAd.ps1`:
-> 1. `$correlationAttribute` - Must match your account structure (typically `employeeId`)
-> 2. `$allowSelfUsage` - Set according to your business requirements
-> 3. `$fieldsToCheck` - Define which attributes to validate and their relationships
-> 
-> The example configuration is tailored for Active Directory. Adjust field names and cross-check logic for other target systems.
-
-> [!IMPORTANT]
-> **Field Mapping Requirement**: The `accountFieldName` specified in `$correlationAttribute` (typically `employeeId`) MUST be mapped in your HelloID field mapping configuration for ALL operations where the uniqueness check is used (create, update, etc.). If this field is not mapped or is empty, the uniqueness check cannot function correctly.
-> 
-> **Common mistake**: Mapping the field only for 'create' but using the uniqueness check for both 'create' and 'update'.
-> 
-> **Solution**: Ensure the correlation attribute field is mapped for all relevant operations in your HelloID field mapping configuration. The script will validate that the field exists and has a value before performing any uniqueness checks.
-
-**Correlation Attribute Configuration**
-
-```powershell
-$correlationAttribute = [PSCustomObject]@{
-    accountFieldName = "employeeId"  # Property name in the account object from HelloID
-    systemFieldName  = "employeeId"  # Corresponding column name in the blacklist database
-}
-```
-
-This mapping identifies which attribute links persons between HelloID and the blacklist database. It's essential for:
-- Determining value ownership (does this value belong to the current person or someone else?)
-- Enabling self-usage checks
-- Supporting automatic value restoration for returning employees
-
-**Allow Self-Usage Configuration**
-
-```powershell
-$allowSelfUsage = $true  # Default: true (recommended)
-```
-
-Controls whether a person can reuse values they already own:
-- **`$true` (recommended)**: Person's existing values are treated as unique. They can keep their email, username, etc. without triggering non-unique warnings.
-- **`$false` (strict mode)**: Even the person's own values are treated as non-unique, forcing regeneration of all values. Use this for complete value refresh scenarios or migrations where all values must be regenerated.
-
-**Fields to Check Configuration**
-
-Configure which attributes to validate and how they relate to each other:
-
-```powershell
-$fieldsToCheck = [PSCustomObject]@{
-    "userPrincipalName" = [PSCustomObject]@{
-        systemFieldName = 'userPrincipalName'  # Database column to query
-        accountValue    = $a.userPrincipalName # Value from account object
-        keepInSyncWith  = @("mail", "proxyAddresses")  # Related fields that share uniqueness status
-        crossCheckOn    = @("mail")  # Also check if value exists as different attribute type
-    }
-    # ... additional fields
-}
-```
-
-Configuration properties:
-- **systemFieldName**: The `attributeName` value to search for in the blacklist database
-- **accountValue**: The actual value from the account object to validate
-- **keepInSyncWith**: If this field is non-unique, automatically mark these related fields as non-unique too
-- **crossCheckOn**: Also search for this value under different attribute names (e.g., check if email exists as both 'mail' and 'userPrincipalName')
-
-### Database table structure
-
-The table includes the following columns:
-
-| Column Name    | Data Type     | Description                                                           |
-| -------------- | ------------- | --------------------------------------------------------------------- |
-| employeeId     | NVARCHAR(100) | Unique identifier for an employee (HelloID person)                    |
-| attributeName  | NVARCHAR(100) | Name of the attribute (e.g., Mail, SamAccountName, UserPrincipalName) |
-| attributeValue | NVARCHAR(250) | Value of the attribute (e.g., john.doe@company.com)                   |
-| whenCreated    | DATETIME2(7)  | Timestamp of when the record was originally created                   |
-| whenUpdated    | DATETIME2(7)  | Timestamp of the last update (can be used to track last activity)     |
-| whenDeleted    | DATETIME2(7)  | Timestamp when the record was soft-deleted; `NULL` for active records |
-
-Use the `createTableBlacklist.sql` script to create the required table structure in your database.
+For database setup, table structure, and initial CSV import guidance, see `SupportingFiles/README.md`.
 
 ## Getting help
 

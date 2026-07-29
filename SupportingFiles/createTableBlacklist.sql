@@ -10,7 +10,7 @@ GO
 CREATE TABLE [dbo].[blacklist](
 	[attributeName] [nvarchar](50) NOT NULL,
 	[attributeValue] [nvarchar](255) NOT NULL,
-	[employeeId] [nvarchar](50) NOT NULL,
+	[employeeId] [nvarchar](50) NULL,
 	[whenCreated] [datetime2](7) NULL,
 	[whenUpdated] [datetime2](7) NULL,
 	[whenDeleted] [datetime2](7) NULL
@@ -39,7 +39,9 @@ GO
 CREATE NONCLUSTERED INDEX [IX_blacklist_2] ON [dbo].[blacklist]
 (
 	[employeeId] ASC
-)WITH (PAD_INDEX = OFF, STATISTICS_NORECOMPUTE = OFF, SORT_IN_TEMPDB = OFF, DROP_EXISTING = OFF, ONLINE = OFF, ALLOW_ROW_LOCKS = ON, ALLOW_PAGE_LOCKS = ON, OPTIMIZE_FOR_SEQUENTIAL_KEY = OFF) ON [PRIMARY]
+)
+WHERE [employeeId] IS NOT NULL
+WITH (PAD_INDEX = OFF, STATISTICS_NORECOMPUTE = OFF, SORT_IN_TEMPDB = OFF, DROP_EXISTING = OFF, ONLINE = OFF, ALLOW_ROW_LOCKS = ON, ALLOW_PAGE_LOCKS = ON, OPTIMIZE_FOR_SEQUENTIAL_KEY = OFF) ON [PRIMARY]
 GO
 
 SET ANSI_PADDING ON
