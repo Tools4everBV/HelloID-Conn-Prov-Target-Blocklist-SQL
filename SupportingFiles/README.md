@@ -1,17 +1,17 @@
-# SupportingFiles
+﻿# SupportingFiles
 
-This folder contains helper files for preparing and maintaining the SQL blacklist database.
+This folder contains helper files for preparing and maintaining the SQL blocklist database.
 
 ## Contents
 
 | File                           | Purpose                                                                                      |
 | ------------------------------ | -------------------------------------------------------------------------------------------- |
-| `createTableBlacklist.sql`     | Creates the required SQL blacklist table and indexes.                                        |
-| `importInitialDataFromCsv.ps1` | Imports initial blacklist data from CSV and enriches records using Active Directory lookups. |
+| `createTableBlocklist.sql`     | Creates the required SQL blocklist table and indexes.                                        |
+| `importInitialDataFromCsv.ps1` | Imports initial blocklist data from CSV and enriches records using Active Directory lookups. |
 
 ## Database setup
 
-Run `createTableBlacklist.sql` in SQL Server Management Studio (or equivalent) before using the connector.
+Run `createTableBlocklist.sql` in SQL Server Management Studio (or equivalent) before using the connector.
 
 ### Table structure
 
@@ -28,13 +28,13 @@ Run `createTableBlacklist.sql` in SQL Server Management Studio (or equivalent) b
 
 The SQL script creates the following indexes to optimize lookups:
 
-- `IX_blacklist` on `(attributeName, attributeValue)`
-- `IX_blacklist_1` on `(attributeValue)`
-- `IX_blacklist_2` filtered index on `(employeeId)` where employeeId is not null
+- `IX_blocklist` on `(attributeName, attributeValue)`
+- `IX_blocklist_1` on `(attributeValue)`
+- `IX_blocklist_2` filtered index on `(employeeId)` where employeeId is not null
 
 ## Initial CSV import
 
-Use `importInitialDataFromCsv.ps1` to import historical values into the blacklist table.
+Use `importInitialDataFromCsv.ps1` to import historical values into the blocklist table.
 
 ### CSV format
 
@@ -53,7 +53,7 @@ Expected columns:
 
 - Imports rows from CSV
 - Looks up AD account details for mail entries
-- Adds or updates blacklist entries in SQL
+- Adds or updates blocklist entries in SQL
 - Optionally adds `UserPrincipalName` entries based on mail lookup results
 - Supports dry-run execution from the HelloID action context
 

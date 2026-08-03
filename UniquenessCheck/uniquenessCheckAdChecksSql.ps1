@@ -1,5 +1,5 @@
 #########################################################################
-# HelloID-Conn-Prov-Target-Blacklist-Check-On-External-Systems-AD-SQL
+# HelloID-Conn-Prov-Target-Blocklist-Check-On-External-Systems-AD-SQL
 #########################################################################
 
 # Initialize default properties
@@ -26,8 +26,8 @@ $nonUniqueFields = [System.Collections.Generic.List[PSCustomObject]]::new()
 #region Change mapping here
 
 # Correlation Attribute
-# Identifies and matches persons between the account object (from HelloID) and the blacklist database
-# Used to determine ownership of values: does a blacklisted value belong to the current person or someone else?
+# Identifies and matches persons between the account object (from HelloID) and the blocklist database
+# Used to determine ownership of values: does a blocklisted value belong to the current person or someone else?
 # Required for: Self-usage checks, retention period validation, and ownership determination
 #
 # IMPORTANT: The accountFieldName specified here MUST be mapped in your field mapping configuration
@@ -37,11 +37,11 @@ $nonUniqueFields = [System.Collections.Generic.List[PSCustomObject]]::new()
 # Solution: Ensure the field is mapped for all relevant operations in your HelloID configuration.
 $correlationAttribute = [PSCustomObject]@{
     accountFieldName = "employeeId"  # Property name in the account object received from HelloID - MUST be mapped in field mapping!
-    systemFieldName  = "employeeId"  # Corresponding column name in the blacklist database table
+    systemFieldName  = "employeeId"  # Corresponding column name in the blocklist database table
 }
 
 # Allow Self-Usage Configuration
-# Determines whether a person can reuse values they already own in the blacklist database
+# Determines whether a person can reuse values they already own in the blocklist database
 # - $true (recommended): Person's own values are treated as unique
 #   Example: Person can keep their existing email address without triggering non-unique warnings
 #   This is the normal behavior for most scenarios
@@ -52,9 +52,9 @@ $correlationAttribute = [PSCustomObject]@{
 $allowSelfUsage = $true
 
 # Fields to Check for Uniqueness
-# Defines which account properties should be validated against the blacklist database
+# Defines which account properties should be validated against the blocklist database
 # Each field configuration includes:
-# - systemFieldName: The database column name to query (attributeName field in the blacklist table)
+# - systemFieldName: The database column name to query (attributeName field in the blocklist table)
 # - accountValue: The actual value from the account object to validate
 # - keepInSyncWith: Related properties that share uniqueness status (if one is non-unique, all are marked non-unique)
 # - crossCheckOn: Additional properties to check for conflicts (searches across multiple attributeName values)
@@ -73,7 +73,7 @@ $fieldsToCheck = [PSCustomObject]@{
         crossCheckOn    = @("userPrincipalName")
     }
     "proxyAddresses"    = [PSCustomObject]@{
-        systemFieldName = 'mail' # Note: proxyAddresses normally isn't in the blacklist database, only the primary SMTP address (mail attribute) is checked
+        systemFieldName = 'mail' # Note: proxyAddresses normally isn't in the blocklist database, only the primary SMTP address (mail attribute) is checked
         accountValue    = $a.proxyAddresses
         keepInSyncWith  = @("userPrincipalName", "mail")
         crossCheckOn    = @("userPrincipalName")
@@ -87,17 +87,123 @@ $fieldsToCheck = [PSCustomObject]@{
     "commonName"        = [PSCustomObject]@{
         systemFieldName = 'cn'
         accountValue    = $a.commonName
-        keepInSyncWith  = $null
+        keepInSyncWith  = @("sAMAccountName")
         crossCheckOn    = $null
     }
 }
 #endregion Change mapping here
 
 #region functions
+function Get-MSEntraCertificate {
+    [CmdletBinding()]
+    param(
+        [parameter(Mandatory)]
+        [string]
+        $CertificateBase64String,
+
+        [parameter(Mandatory)]
+        [string]
+        $CertificatePassword
+    )
+    try {        
+        $rawCertificate = [system.convert]::FromBase64String($CertificateBase64String)
+        $certificate = [System.Security.Cryptography.X509Certificates.X509Certificate2]::new($rawCertificate, $CertificatePassword, [System.Security.Cryptography.X509Certificates.X509KeyStorageFlags]::Exportable -bor [System.Security.Cryptography.X509Certificates.X509KeyStorageFlags]::EphemeralKeySet)
+        Write-Output $certificate
+    }
+    catch {
+        $PSCmdlet.ThrowTerminatingError($_)
+    }
+}
+
+function Get-MSEntraAccessToken {
+    [CmdletBinding()]
+    [OutputType([System.Collections.Generic.Dictionary[[String], [String]]])]
+    param(
+        [Parameter(Mandatory)]
+        $Certificate,
+
+        [parameter(Mandatory)]
+        [string]
+        $TenantID,
+
+        [parameter(Mandatory)]
+        [string]
+        $AppId
+    )
+    try {
+        # Get the DER encoded bytes of the certificate
+        $derBytes = $Certificate.RawData
+
+        # Compute the SHA-256 hash of the DER encoded bytes
+        $sha256 = [System.Security.Cryptography.SHA256]::Create()
+        $hashBytes = $sha256.ComputeHash($derBytes)
+        $base64Thumbprint = [System.Convert]::ToBase64String($hashBytes).Replace('+', '-').Replace('/', '_').Replace('=', '')
+
+        # Create a JWT (JSON Web Token) header
+        $header = @{
+            'alg'      = 'RS256'
+            'typ'      = 'JWT'
+            'x5t#S256' = $base64Thumbprint
+        } | ConvertTo-Json
+        $base64Header = [System.Convert]::ToBase64String([System.Text.Encoding]::UTF8.GetBytes($header))
+
+        # Calculate the Unix timestamp (seconds since 1970-01-01T00:00:00Z) for 'exp', 'nbf' and 'iat'
+        $currentUnixTimestamp = [math]::Round(((Get-Date).ToUniversalTime() - ([datetime]'1970-01-01T00:00:00Z').ToUniversalTime()).TotalSeconds)
+
+        # Create a JWT payload
+        $payload = [Ordered]@{
+            'iss' = "$($AppId)"
+            'sub' = "$($AppId)"
+            'aud' = "https://login.microsoftonline.com/$($TenantID)/oauth2/token"
+            'exp' = ($currentUnixTimestamp + 3600) # Expires in 1 hour
+            'nbf' = ($currentUnixTimestamp - 300) # Not before 5 minutes ago
+            'iat' = $currentUnixTimestamp
+            'jti' = [Guid]::NewGuid().ToString()
+        } | ConvertTo-Json
+        $base64Payload = [System.Convert]::ToBase64String([System.Text.Encoding]::UTF8.GetBytes($payload)).Replace('+', '-').Replace('/', '_').Replace('=', '')
+
+        # This also supports CNG instead of only CAPI 
+        $rsaPrivate = [System.Security.Cryptography.X509Certificates.RSACertificateExtensions]::GetRSAPrivateKey($Certificate)
+        $signatureInput = "$base64Header.$base64Payload"
+        $bytesToSign = [Text.Encoding]::UTF8.GetBytes($signatureInput)
+        $hashAlgorithm = [System.Security.Cryptography.HashAlgorithmName]::SHA256
+        $padding = [System.Security.Cryptography.RSASignaturePadding]::Pkcs1
+        $signature = $rsaPrivate.SignData($bytesToSign, $hashAlgorithm, $padding)
+        $base64Signature = [System.Convert]::ToBase64String($signature).Replace('+', '-').Replace('/', '_').Replace('=', '')
+        $jwtToken = "$base64Header.$base64Payload.$base64Signature"
+
+        $createEntraAccessTokenBody = @{
+            grant_type            = 'client_credentials'
+            client_id             = $AppId
+            client_assertion_type = 'urn:ietf:params:oauth:client-assertion-type:jwt-bearer'
+            client_assertion      = $jwtToken
+            resource              = 'https://database.windows.net'
+        }
+
+        $createEntraAccessTokenSplatParams = @{
+            Uri         = "https://login.microsoftonline.com/$($TenantID)/oauth2/token"
+            Body        = $createEntraAccessTokenBody
+            Method      = 'POST'
+            ContentType = 'application/x-www-form-urlencoded'
+            Verbose     = $false
+            ErrorAction = 'Stop'
+        }
+
+        $createEntraAccessTokenResponse = Invoke-RestMethod @createEntraAccessTokenSplatParams
+        Write-Output $createEntraAccessTokenResponse.access_token
+    }
+    catch {
+        $PSCmdlet.ThrowTerminatingError($_)
+    }
+}
+
 function Invoke-SQLQuery {
     param(
         [parameter(Mandatory = $true)]
         $ConnectionString,
+
+        [parameter(Mandatory = $false)]
+        $AccessToken,
 
         [parameter(Mandatory = $false)]
         $Username,
@@ -114,24 +220,24 @@ function Invoke-SQLQuery {
     try {
         $Data.value = $null
 
-        # Initialize connection and execute query
-        if (-not[String]::IsNullOrEmpty($Username) -and -not[String]::IsNullOrEmpty($Password)) {
-            # First create the PSCredential object
-            $securePassword = ConvertTo-SecureString -String $Password -AsPlainText -Force
-            $credential = [System.Management.Automation.PSCredential]::new($Username, $securePassword)
- 
-            # Set the password as read only
-            $credential.Password.MakeReadOnly()
- 
-            # Create the SqlCredential object
-            $sqlCredential = [System.Data.SqlClient.SqlCredential]::new($credential.username, $credential.password)
-        }
         # Connect to the SQL server
         $SqlConnection = [System.Data.SqlClient.SqlConnection]::new()
-        $SqlConnection.ConnectionString = $ConnectionString
-        if (-not[String]::IsNullOrEmpty($sqlCredential)) {
+        $SqlConnection.ConnectionString = "$ConnectionString"
+
+        # Use AccessToken if provided, otherwise use SQL credentials
+        if (-not[String]::IsNullOrEmpty($AccessToken)) {
+            # Azure SQL authentication using AccessToken
+            $SqlConnection.AccessToken = $AccessToken
+        }
+        elseif (-not[String]::IsNullOrEmpty($Username) -and -not[String]::IsNullOrEmpty($Password)) {
+            # Local SQL authentication using credentials
+            $securePassword = ConvertTo-SecureString -String $Password -AsPlainText -Force
+            $credential = [System.Management.Automation.PSCredential]::new($Username, $securePassword)
+            $credential.Password.MakeReadOnly()
+            $sqlCredential = [System.Data.SqlClient.SqlCredential]::new($credential.username, $credential.password)
             $SqlConnection.Credential = $sqlCredential
         }
+
         $SqlConnection.Open()
         Write-Verbose "Successfully connected to SQL database"
 
@@ -165,6 +271,15 @@ function Invoke-SQLQuery {
 #endregion functions
 
 try {
+    # Determine authentication method based on configuration
+    if ($eRef.configuration.azureSqlAuthentication -eq $true) {
+        $certificate = Get-MSEntraCertificate -CertificateBase64String $eRef.configuration.azureSqlAppCertificateBase64String -CertificatePassword $eRef.configuration.azureSqlAppCertificatePassword
+        $accessToken = Get-MSEntraAccessToken -Certificate $certificate -TenantID $eRef.configuration.azureSqlTenantID -AppId $eRef.configuration.azureSqlAppId
+    }
+    else {
+        $accessToken = $null
+    }
+
     # Validate that correlation attribute is mapped and has a value
     if ([string]::IsNullOrEmpty($correlationAttribute.accountFieldName)) {
         throw "Correlation attribute 'accountFieldName' is not configured. This is a mandatory configuration setting."
@@ -182,7 +297,6 @@ try {
 
     # Query current data in database
     foreach ($fieldToCheck in $fieldsToCheck.PsObject.Properties | Where-Object { -not[String]::IsNullOrEmpty($_.Value.accountValue) }) {
-        
         # Skip if this field is already marked as non-unique
         if ($nonUniqueFields -contains $fieldToCheck.Name) {
             Write-Verbose "Skipping uniqueness check for property [$($fieldToCheck.Name)] with value(s) [$($fieldToCheck.Value.accountValue -join ', ')] because it is already marked as non-unique (either directly or through keepInSyncWith configuration)."
@@ -216,6 +330,7 @@ try {
 
             $querySelectSplatParams = @{
                 ConnectionString = $eRef.configuration.connectionString
+                AccessToken      = $accessToken
                 Username         = $eRef.configuration.username
                 Password         = $eRef.configuration.password
                 SqlQuery         = $querySelect
@@ -233,7 +348,7 @@ try {
                     # Check if the person is using the value themselves (based on correlation attribute)
                     if ($dbRow.($correlationAttribute.systemFieldName) -eq $a.($correlationAttribute.accountFieldName)) {
                         if ($allowSelfUsage) {
-                            Write-Information "Person is using property [$($fieldToCheck.Name)] with value [$fieldToCheckAccountValue] themselves in SQL blacklist. Continuing with AD availability check."
+                            Write-Information "Person is using property [$($fieldToCheck.Name)] with value [$fieldToCheckAccountValue] themselves."
                         }
                         else {
                             # Self-usage is not allowed - treat as non-unique
@@ -284,96 +399,13 @@ try {
                             break
                         }
                         else {
-                            Write-Information "Property [$($fieldToCheck.Name)] with value [$fieldToCheckAccountValue] is reusable based on SQL retention. Although it was previously used by [$($correlationAttribute.systemFieldName)]: [$($dbRow.($correlationAttribute.systemFieldName))], the [whenDeleted] timestamp [$($dbRow.whenDeleted)] exceeds the allowed retention period of [$($retentionPeriod) days]. Continuing with AD availability check."
+                            Write-Information "Property [$($fieldToCheck.Name)] with value [$fieldToCheckAccountValue] is considered unique. Although it was previously used by [$($correlationAttribute.systemFieldName)]: [$($dbRow.($correlationAttribute.systemFieldName))], the [whenDeleted] timestamp [$($dbRow.whenDeleted)] exceeds the allowed retention period of [$($retentionPeriod) days] and the value will be reused."
                         }
                     }
                 }
             }
             elseif ($selectRowCount -eq 0) {
-                Write-Information "Property [$($fieldToCheck.Name)] with value [$fieldToCheckAccountValue] was not found in SQL blacklist. Continuing with AD availability check."
-            }
-
-            # If SQL already marked this field as non-unique, skip AD check
-            if ($nonUniqueFields -contains $fieldToCheck.Name) {
-                continue
-            }
-
-            # Check if the value is available in AD (same behavior as built-in AD uniqueness check)
-            $adFilter = $null
-            $adSystemFieldName = $fieldToCheck.Value.systemFieldName
-
-            if ($adSystemFieldName -eq 'proxyAddresses') {
-                # proxyAddresses is multi-valued and normally stored with smtp:/SMTP: prefix in AD
-                $adFilter = "$adSystemFieldName -eq 'smtp:$fieldToCheckAccountValue'"
-            }
-            else {
-                $adFilter = "$adSystemFieldName -eq '$fieldToCheckAccountValue'"
-            }
-
-            if (@($fieldToCheck.Value.crossCheckOn).Count -ge 1) {
-                foreach ($fieldToCrossCheckOn in $fieldToCheck.Value.crossCheckOn) {
-                    $crossCheckAdSystemFieldName = $fieldsToCheck.$fieldToCrossCheckOn.systemFieldName
-                    if ($crossCheckAdSystemFieldName -eq 'proxyAddresses') {
-                        $adFilter = $adFilter + " -or $crossCheckAdSystemFieldName -eq 'smtp:$fieldToCheckAccountValue'"
-                    }
-                    else {
-                        $adFilter = $adFilter + " -or $crossCheckAdSystemFieldName -eq '$fieldToCheckAccountValue'"
-                    }
-                }
-            }
-
-            $actionMessage = "querying AD account where [filter] = [$adFilter]"
-            $getADAccountSplatParams = @{
-                Filter      = $adFilter
-                Verbose     = $false
-                ErrorAction = "Stop"
-            }
-            $getADAccountResponse = Get-ADUser @getADAccountSplatParams
-            $correlatedAdAccounts = @($getADAccountResponse)
-
-            Write-Information "Queried AD account where [filter] = [$adFilter]. Result count: [$($correlatedAdAccounts.Count)]"
-
-            if ($correlatedAdAccounts.Count -gt 0) {
-                $currentAdAccount = $null
-
-                if ($o.ToLower() -ne "create" -and -not [string]::IsNullOrEmpty($aRef.ObjectGuid)) {
-                    $currentAdAccount = @($correlatedAdAccounts | Where-Object { [string]$_.ObjectGuid -eq [string]$aRef.ObjectGuid } | Select-Object -First 1)
-                }
-
-                if ($currentAdAccount) {
-                    if ($allowSelfUsage) {
-                        Write-Information "Person is using property [$($fieldToCheck.Name)] with value [$fieldToCheckAccountValue] themselves in AD."
-                    }
-                    else {
-                        Write-Warning "Property [$($fieldToCheck.Name)] with value [$fieldToCheckAccountValue] is not unique. Person is using this value themselves in AD, but self-usage is disabled (allowSelfUsage = false)."
-                        [void]$NonUniqueFields.Add($fieldToCheck.Name)
-
-                        if (@($fieldToCheck.Value.keepInSyncWith).Count -ge 1) {
-                            foreach ($fieldToKeepInSyncWith in $fieldToCheck.Value.keepInSyncWith | Where-Object { $_ -in $a.PsObject.Properties.Name }) {
-                                Write-Warning "Property [$fieldToKeepInSyncWith] is marked as non-unique because it is configured to keepInSyncWith [$($fieldToCheck.Name)], which is not unique."
-                                [void]$NonUniqueFields.Add($fieldToKeepInSyncWith)
-                            }
-                        }
-
-                        break
-                    }
-                }
-                else {
-                    Write-Warning "Property [$($fieldToCheck.Name)] with value [$fieldToCheckAccountValue] is not unique because this value already exists in AD."
-                    [void]$NonUniqueFields.Add($fieldToCheck.Name)
-
-                    if (@($fieldToCheck.Value.keepInSyncWith).Count -ge 1) {
-                        foreach ($fieldToKeepInSyncWith in $fieldToCheck.Value.keepInSyncWith | Where-Object { $_ -in $a.PsObject.Properties.Name }) {
-                            Write-Warning "Property [$fieldToKeepInSyncWith] is marked as non-unique because it is configured to keepInSyncWith [$($fieldToCheck.Name)], which is not unique."
-                            [void]$NonUniqueFields.Add($fieldToKeepInSyncWith)
-                        }
-                    }
-
-                    break
-                }
-            }
-            else {
-                Write-Information "Property [$($fieldToCheck.Name)] with value [$fieldToCheckAccountValue] is unique across SQL blacklist and AD."
+                Write-Information "Property [$($fieldToCheck.Name)] with value [$fieldToCheckAccountValue] is unique."
             }
         }
     }

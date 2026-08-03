@@ -1,5 +1,5 @@
 #####################################################
-# HelloID-Conn-Prov-Target-Blacklist-SQL-Delete
+# HelloID-Conn-Prov-Target-Blocklist-SQL-Delete
 # Use data from dependent system
 #####################################################
 
@@ -8,10 +8,116 @@ $table = $actionContext.configuration.table
 $attributeNames = $($actionContext.Data | Select-Object * -ExcludeProperty employeeId, whenDeleted, whenCreated, whenUpdated).PSObject.Properties.Name
 
 #region functions
+function Get-MSEntraCertificate {
+    [CmdletBinding()]
+    param(
+        [parameter(Mandatory)]
+        [string]
+        $CertificateBase64String,
+
+        [parameter(Mandatory)]
+        [string]
+        $CertificatePassword
+    )
+    try {        
+        $rawCertificate = [system.convert]::FromBase64String($CertificateBase64String)
+        $certificate = [System.Security.Cryptography.X509Certificates.X509Certificate2]::new($rawCertificate, $CertificatePassword, [System.Security.Cryptography.X509Certificates.X509KeyStorageFlags]::Exportable -bor [System.Security.Cryptography.X509Certificates.X509KeyStorageFlags]::EphemeralKeySet)
+        Write-Output $certificate
+    }
+    catch {
+        $PSCmdlet.ThrowTerminatingError($_)
+    }
+}
+
+function Get-MSEntraAccessToken {
+    [CmdletBinding()]
+    [OutputType([System.Collections.Generic.Dictionary[[String], [String]]])]
+    param(
+        [Parameter(Mandatory)]
+        $Certificate,
+
+        [parameter(Mandatory)]
+        [string]
+        $TenantID,
+
+        [parameter(Mandatory)]
+        [string]
+        $AppId
+    )
+    try {
+        # Get the DER encoded bytes of the certificate
+        $derBytes = $Certificate.RawData
+
+        # Compute the SHA-256 hash of the DER encoded bytes
+        $sha256 = [System.Security.Cryptography.SHA256]::Create()
+        $hashBytes = $sha256.ComputeHash($derBytes)
+        $base64Thumbprint = [System.Convert]::ToBase64String($hashBytes).Replace('+', '-').Replace('/', '_').Replace('=', '')
+
+        # Create a JWT (JSON Web Token) header
+        $header = @{
+            'alg'      = 'RS256'
+            'typ'      = 'JWT'
+            'x5t#S256' = $base64Thumbprint
+        } | ConvertTo-Json
+        $base64Header = [System.Convert]::ToBase64String([System.Text.Encoding]::UTF8.GetBytes($header))
+
+        # Calculate the Unix timestamp (seconds since 1970-01-01T00:00:00Z) for 'exp', 'nbf' and 'iat'
+        $currentUnixTimestamp = [math]::Round(((Get-Date).ToUniversalTime() - ([datetime]'1970-01-01T00:00:00Z').ToUniversalTime()).TotalSeconds)
+
+        # Create a JWT payload
+        $payload = [Ordered]@{
+            'iss' = "$($AppId)"
+            'sub' = "$($AppId)"
+            'aud' = "https://login.microsoftonline.com/$($TenantID)/oauth2/token"
+            'exp' = ($currentUnixTimestamp + 3600) # Expires in 1 hour
+            'nbf' = ($currentUnixTimestamp - 300) # Not before 5 minutes ago
+            'iat' = $currentUnixTimestamp
+            'jti' = [Guid]::NewGuid().ToString()
+        } | ConvertTo-Json
+        $base64Payload = [System.Convert]::ToBase64String([System.Text.Encoding]::UTF8.GetBytes($payload)).Replace('+', '-').Replace('/', '_').Replace('=', '')
+
+        # This also supports CNG instead of only CAPI 
+        $rsaPrivate = [System.Security.Cryptography.X509Certificates.RSACertificateExtensions]::GetRSAPrivateKey($Certificate)
+        $signatureInput = "$base64Header.$base64Payload"
+        $bytesToSign = [Text.Encoding]::UTF8.GetBytes($signatureInput)
+        $hashAlgorithm = [System.Security.Cryptography.HashAlgorithmName]::SHA256
+        $padding = [System.Security.Cryptography.RSASignaturePadding]::Pkcs1
+        $signature = $rsaPrivate.SignData($bytesToSign, $hashAlgorithm, $padding)
+        $base64Signature = [System.Convert]::ToBase64String($signature).Replace('+', '-').Replace('/', '_').Replace('=', '')
+        $jwtToken = "$base64Header.$base64Payload.$base64Signature"
+
+        $createEntraAccessTokenBody = @{
+            grant_type            = 'client_credentials'
+            client_id             = $AppId
+            client_assertion_type = 'urn:ietf:params:oauth:client-assertion-type:jwt-bearer'
+            client_assertion      = $jwtToken
+            resource              = 'https://database.windows.net'
+        }
+
+        $createEntraAccessTokenSplatParams = @{
+            Uri         = "https://login.microsoftonline.com/$($TenantID)/oauth2/token"
+            Body        = $createEntraAccessTokenBody
+            Method      = 'POST'
+            ContentType = 'application/x-www-form-urlencoded'
+            Verbose     = $false
+            ErrorAction = 'Stop'
+        }
+
+        $createEntraAccessTokenResponse = Invoke-RestMethod @createEntraAccessTokenSplatParams
+        Write-Output $createEntraAccessTokenResponse.access_token
+    }
+    catch {
+        $PSCmdlet.ThrowTerminatingError($_)
+    }
+}
+
 function Invoke-SQLQuery {
     param(
         [parameter(Mandatory = $true)]
         $ConnectionString,
+
+        [parameter(Mandatory = $false)]
+        $AccessToken,
 
         [parameter(Mandatory = $false)]
         $Username,
@@ -28,24 +134,24 @@ function Invoke-SQLQuery {
     try {
         $Data.value = $null
 
-        # Initialize connection and execute query
-        if (-not[String]::IsNullOrEmpty($Username) -and -not[String]::IsNullOrEmpty($Password)) {
-            # First create the PSCredential object
-            $securePassword = ConvertTo-SecureString -String $Password -AsPlainText -Force
-            $credential = [System.Management.Automation.PSCredential]::new($Username, $securePassword)
-
-            # Set the password as read only
-            $credential.Password.MakeReadOnly()
-
-            # Create the SqlCredential object
-            $sqlCredential = [System.Data.SqlClient.SqlCredential]::new($credential.username, $credential.password)
-        }
         # Connect to the SQL server
         $SqlConnection = [System.Data.SqlClient.SqlConnection]::new()
-        $SqlConnection.ConnectionString = $ConnectionString
-        if (-not[String]::IsNullOrEmpty($sqlCredential)) {
+        $SqlConnection.ConnectionString = "$ConnectionString"
+        
+        # Use AccessToken if provided, otherwise use SQL credentials
+        if (-not[String]::IsNullOrEmpty($AccessToken)) {
+            # Azure SQL authentication using AccessToken
+            $SqlConnection.AccessToken = $AccessToken
+        }
+        elseif (-not[String]::IsNullOrEmpty($Username) -and -not[String]::IsNullOrEmpty($Password)) {
+            # Local SQL authentication using credentials
+            $securePassword = ConvertTo-SecureString -String $Password -AsPlainText -Force
+            $credential = [System.Management.Automation.PSCredential]::new($Username, $securePassword)
+            $credential.Password.MakeReadOnly()
+            $sqlCredential = [System.Data.SqlClient.SqlCredential]::new($credential.username, $credential.password)
             $SqlConnection.Credential = $sqlCredential
         }
+        
         $SqlConnection.Open()
         Write-Information "Successfully connected to SQL database"
 
@@ -79,16 +185,21 @@ function Invoke-SQLQuery {
 #endregion functions
 
 try {
+    $actionMessage = "initializing connection to SQL database"
+    
+    if ($actionContext.configuration.azureSqlAuthentication -eq $true) {
+        $certificate = Get-MSEntraCertificate -CertificateBase64String $actionContext.configuration.azureSqlAppCertificateBase64String -CertificatePassword $actionContext.configuration.azureSqlAppCertificatePassword
+        $accessToken = Get-MSEntraAccessToken -Certificate $certificate -TenantID $actionContext.configuration.azureSqlTenantID -AppId $actionContext.configuration.azureSqlAppId
+    }
+    else {
+        $accessToken = $null
+    }
+
     # Verify account reference
     $actionMessage = "verifying account reference"
     if ([string]::IsNullOrEmpty($($actionContext.References.Account))) {
         throw "The account reference could not be found"
     }
-
-    # Import data from table
-    $actionMessage = "importing data from table [$table]"
-
-    Write-Information "Imported data from table [$table]"
 
     foreach ($attributeName in $attributeNames) {
         # Check if attribute is in table
@@ -98,6 +209,7 @@ try {
 
         $querySelectSplatParams = @{
             ConnectionString = $actionContext.configuration.connectionString
+            AccessToken      = $accessToken
             Username         = $actionContext.configuration.username
             Password         = $actionContext.configuration.password
             SqlQuery         = $querySelect
@@ -142,6 +254,7 @@ try {
 
                     $queryUpdateSplatParams = @{
                         ConnectionString = $actionContext.configuration.connectionString
+                        AccessToken      = $accessToken
                         Username         = $actionContext.configuration.username
                         Password         = $actionContext.configuration.password
                         SqlQuery         = $queryUpdate

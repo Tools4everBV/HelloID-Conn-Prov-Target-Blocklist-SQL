@@ -1,19 +1,33 @@
-# Change Log
+﻿# Change Log
 
 All notable changes to this project will be documented in this file. The format is based on [Keep a Changelog](https://keepachangelog.com/), and this project adheres to [Semantic Versioning](https://semver.org/).
+
+## [2.2.0] - 2026-08-03
+
+### Added
+
+- Added support for connecting to a `Azure SQL` database.
+- Added `UniquenessCheck/uniquenessCheckEntraIdChecksSqlAndEntraId.ps1` for combined uniqueness validation against SQL and Microsoft Entra ID.
+- Added `UniquenessCheck/README.md` with usage and configuration details for the uniqueness check scripts.
+- Added `SupportingFiles/createTableBlocklist.sql` as the renamed SQL table setup script.
+
+### Changed
+
+- Renamed blocklist uniqueness scripts from `CheckOnExternalSystems/*` to `UniquenessCheck/*` and updated documentation references accordingly.
+- Replaced terminology across the repository from Blacklist/blacklist to Blocklist/blocklist.
 
 ## [2.1.0] - 2026-07-28
 
 ### Added
 
-- New combined uniqueness check script `checkOnExternalSystemsAdAndSql.ps1` to validate values against both SQL blacklist and Active Directory in one flow, including cross-check support and keep-in-sync behavior.
-- New initial import utility `importInitialDataFromCsv.ps1` for loading blacklist data from CSV, enriching entries via AD lookup, and auto-adding `UserPrincipalName` rows for mail-based input.
+- New combined uniqueness check script `checkOnExternalSystemsAdAndSql.ps1` to validate values against both SQL blocklist and Active Directory in one flow, including cross-check support and keep-in-sync behavior.
+- New initial import utility `importInitialDataFromCsv.ps1` for loading blocklist data from CSV, enriching entries via AD lookup, and auto-adding `UserPrincipalName` rows for mail-based input.
 - Added separated folders for `CheckOnExternalSystems` and `SupportingFiles` including a separated `README.md`.
 
 ### Changed
 
-- Updated SQL table definition in `createTableBlacklist.sql` so `employeeId` allows `NULL`, aligning with import and lookup scenarios where no employee ID is available.
-- Added a filtered index on `employeeId` (`IX_blacklist_2`) to optimize lookups for populated employee IDs while keeping nullable records supported.
+- Updated SQL table definition in `createTableBlocklist.sql` so `employeeId` allows `NULL`, aligning with import and lookup scenarios where no employee ID is available.
+- Added a filtered index on `employeeId` (`IX_blocklist_2`) to optimize lookups for populated employee IDs while keeping nullable records supported.
 
 ## [2.0.2] - 2026-04-01
 
@@ -38,7 +52,7 @@ All notable changes to this project will be documented in this file. The format 
 
 ## [2.0.0] - 2026-01-07
 
-This is a major release of HelloID-Conn-Prov-Target-Blacklist-SQL with significant enhancements to match the CSV blacklist connector functionality and Tools4ever V2 connector standards, plus major improvements to code maintainability, configurability, and operational transparency.
+This is a major release of HelloID-Conn-Prov-Target-Blocklist-SQL with significant enhancements to match the CSV blocklist connector functionality and Tools4ever V2 connector standards, plus major improvements to code maintainability, configurability, and operational transparency.
 
 ### Added
 
@@ -56,7 +70,7 @@ This is a major release of HelloID-Conn-Prov-Target-Blacklist-SQL with significa
 - `#region Configuration` block in `checkOnExternalSystemsAd.ps1` for better code organization
 - README section "Configuring checkOnExternalSystemsAd.ps1" with detailed configuration examples
 - README warnings for retention period synchronization and initial configuration requirements
-- README use cases section explaining practical applications of the blacklist connector
+- README use cases section explaining practical applications of the blocklist connector
 - README supported features table documenting available capabilities
 
 ### Changed
@@ -105,9 +119,9 @@ This is a major release of HelloID-Conn-Prov-Target-Blacklist-SQL with significa
 
 ### Added
 
-- Initial release of HelloID-Conn-Prov-Target-Blacklist-SQL
+- Initial release of HelloID-Conn-Prov-Target-Blocklist-SQL
 - Basic create, update, and delete lifecycle actions
-- SQL database integration for blacklist management
+- SQL database integration for blocklist management
 - Support for tracking employeeId, attributeName, and attributeValue
 - Configuration for connection string and table settings
 - Field mapping for SamAccountName, UserPrincipalName, and employeeId
