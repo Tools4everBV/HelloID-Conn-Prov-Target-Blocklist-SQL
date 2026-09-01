@@ -191,9 +191,11 @@ try {
         foreach ($fieldToCheckAccountValue in $fieldToCheck.Value.accountValue) {
             # Remove smtp: prefix for proxyAddresses
             $fieldToCheckAccountValue = $fieldToCheckAccountValue -replace '(?i)^smtp:', ''
-            
+
+            $sqlAccountValue = $fieldToCheckAccountValue.Replace("'", "''")
+        
             # Build WHERE clause starting with the primary field
-            $whereClause = "[attributeName] = '$($fieldToCheck.Value.systemFieldName)' AND [attributeValue] = '$fieldToCheckAccountValue'"
+            $whereClause = "[attributeName] = '$($fieldToCheck.Value.systemFieldName)' AND [attributeValue] = '$sqlAccountValue'"
             
             # Add cross-check conditions if configured
             if (@($fieldToCheck.Value.crossCheckOn).Count -ge 1) {
@@ -203,10 +205,10 @@ try {
                     
                     # Custom check for proxyAddresses to prefix value with 'smtp:'
                     if ($fieldToCrossCheckOn -eq 'proxyAddresses') {
-                        $whereClause = $whereClause + " OR ([attributeName] = '$crossCheckSystemFieldName' AND [attributeValue] = 'smtp:$fieldToCheckAccountValue')"
+                        $whereClause = $whereClause + " OR ([attributeName] = '$crossCheckSystemFieldName' AND [attributeValue] = 'smtp:$sqlAccountValue')"
                     }
                     else {
-                        $whereClause = $whereClause + " OR ([attributeName] = '$crossCheckSystemFieldName' AND [attributeValue] = '$fieldToCheckAccountValue')"
+                        $whereClause = $whereClause + " OR ([attributeName] = '$crossCheckSystemFieldName' AND [attributeValue] = '$sqlAccountValue')"
                     }
                 }
             }
