@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file. The format is based on [Keep a Changelog](https://keepachangelog.com/), and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [2.1.1] - 2026-09-01
+
+### Fixed
+
+- Fixed SQL injection vulnerability in `checkOnExternalSystemsAdAndSql.ps1` and `checkOnExternalSystemsAd.ps1` by escaping single quotes in account values before using them in SQL WHERE clauses (e.g., names like "in 't veld" or "van 't slot")
+
 ## [2.1.0] - 2026-07-28
 
 ### Added
