@@ -1,12 +1,12 @@
-#####################################################
-# Blacklist CSV Import with AD Lookup
+﻿#####################################################
+# Blocklist CSV Import with AD Lookup
 # CSV format: attributeName, attributeValue, employeeId, whenCreated, whenUpdated, whenDeleted
-# Imports blacklist entries and enriches with AD lookup for missing employee IDs
+# Imports blocklist entries and enriches with AD lookup for missing employee IDs
 #####################################################
 
 # Parameters
 param(
-    [string]$CsvPath = 'C:\HelloID\Blacklist-initial-import\blacklist_export_final.csv',
+    [string]$CsvPath = 'C:\HelloID\Blocklist-initial-import\blocklist_export_final.csv',
     [string]$MailAttribute = 'mail',
     [int]$BatchSize = 50
 )
@@ -25,7 +25,7 @@ $csvImport = @(Import-Csv -Path $CsvPath -Delimiter ';')
 # Debug: Check if CSV is loaded
 Write-Warning "CSV file loaded: $(($csvImport | Measure-Object).Count) rows found"
 if ($csvImport.Count -eq 0) {
-    Write-Warning "ERROR: CSV file is empty or not found at path: C:\HelloID\Blacklist-initial-import\blacklist_export_final.csv"
+    Write-Warning "ERROR: CSV file is empty or not found at path: C:\HelloID\Blocklist-initial-import\blocklist_export_final.csv"
     exit
 }
 
@@ -146,7 +146,7 @@ function Get-ADUserByAttribute {
     }
 }
 
-function Add-BlacklistEntry {
+function Add-BlocklistEntry {
     param(
         [string]$AttributeName,
         [string]$AttributeValue,
@@ -218,7 +218,7 @@ VALUES
     }
 }
 
-function Test-BlacklistEntryExists {
+function Test-BlocklistEntryExists {
     param(
         [string]$AttributeName,
         [string]$AttributeValue
@@ -241,7 +241,7 @@ function Test-BlacklistEntryExists {
 try {
     $startTime = Get-Date
     
-    Write-Warning "Starting blacklist import (DryRun: $dryRun)"
+    Write-Warning "Starting blocklist import (DryRun: $dryRun)"
     Write-Warning "=========================================="
     Write-Warning "Configuration:"
     Write-Warning "  CSV Path: $CsvPath"
@@ -295,20 +295,20 @@ try {
             }
             
             # Check if entry exists
-            $entryExists = Test-BlacklistEntryExists -AttributeName $attributeName -AttributeValue $attributeValue
+            $entryExists = Test-BlocklistEntryExists -AttributeName $attributeName -AttributeValue $attributeValue
             
             # Add or update entry
-            Add-BlacklistEntry -AttributeName $attributeName -AttributeValue $attributeValue `
+            Add-BlocklistEntry -AttributeName $attributeName -AttributeValue $attributeValue `
                 -EmployeeId $employeeIdFromAD -IsUpdate $entryExists -AdStatus $adStatus
             
-            # Step 2: If mail attribute and UPN found -> also add UPN to blacklist
+            # Step 2: If mail attribute and UPN found -> also add UPN to blocklist
             if ($attributeName -eq $MailAttribute -and -not [string]::IsNullOrEmpty($upnFromAD)) {
                 Write-Verbose "Processing UPN entry [$upnFromAD] from mail [$attributeValue]"
                 
-                $upnExists = Test-BlacklistEntryExists -AttributeName 'UserPrincipalName' -AttributeValue $upnFromAD
+                $upnExists = Test-BlocklistEntryExists -AttributeName 'UserPrincipalName' -AttributeValue $upnFromAD
                 
                 $upnStatus = if ($employeeIdFromAD) { "EmployeeId: $employeeIdFromAD" } else { "No employeeId" }
-                Add-BlacklistEntry -AttributeName 'UserPrincipalName' -AttributeValue $upnFromAD `
+                Add-BlocklistEntry -AttributeName 'UserPrincipalName' -AttributeValue $upnFromAD `
                     -EmployeeId $employeeIdFromAD -IsUpdate $upnExists -AdStatus $upnStatus
             }
         }
