@@ -16,6 +16,11 @@ All notable changes to this project will be documented in this file. The format 
 - Renamed blocklist uniqueness scripts from `CheckOnExternalSystems/*` to `UniquenessCheck/*` and updated documentation references accordingly.
 - Replaced terminology across the repository from Blacklist/blacklist to Blocklist/blocklist.
 
+### Fixed
+
+- Fixed SQL injection vulnerability in `UniquenessCheck/uniquenessCheckAdChecksSql.ps1`, `UniquenessCheck/uniquenessCheckAdChecksSqlAndAd.ps1` and `UniquenessCheck/uniquenessCheckEntraIdChecksSqlAndEntraId.ps1` by escaping single quotes in account values before using them in SQL WHERE clauses (e.g., names like "in 't veld" or "van 't slot").
+- Fixed filter errors and injection for values containing single quotes in the Active Directory filter of `UniquenessCheck/uniquenessCheckAdChecksSqlAndAd.ps1` and the Microsoft Graph OData filter of `UniquenessCheck/uniquenessCheckEntraIdChecksSqlAndEntraId.ps1`.
+
 ## [2.1.0] - 2026-07-28
 
 ### Added

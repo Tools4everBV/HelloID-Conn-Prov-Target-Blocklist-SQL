@@ -467,8 +467,11 @@ try {
             # Remove smtp: prefix for proxyAddresses/emailAddresses
             $fieldToCheckAccountValue = $fieldToCheckAccountValue -replace '(?i)^smtp:', ''
 
+            # Escape single quotes to prevent SQL errors and injection for values like "in 't veld"
+            $sqlAccountValue = $fieldToCheckAccountValue.Replace("'", "''")
+
             # Build WHERE clause starting with the primary field
-            $whereClause = "[attributeName] = '$($fieldToCheck.Value.systemFieldName)' AND [attributeValue] = '$fieldToCheckAccountValue'"
+            $whereClause = "[attributeName] = '$($fieldToCheck.Value.systemFieldName)' AND [attributeValue] = '$sqlAccountValue'"
 
             # Add cross-check conditions if configured
             if (@($fieldToCheck.Value.crossCheckOn).Count -ge 1) {
@@ -477,10 +480,10 @@ try {
 
                     # Custom check for exchangeOnline.emailAddresses to prefix value with 'smtp:'
                     if ($fieldToCrossCheckOn -eq 'exchangeOnline.emailAddresses') {
-                        $whereClause = $whereClause + " OR ([attributeName] = '$crossCheckSystemFieldName' AND [attributeValue] = 'smtp:$fieldToCheckAccountValue')"
+                        $whereClause = $whereClause + " OR ([attributeName] = '$crossCheckSystemFieldName' AND [attributeValue] = 'smtp:$sqlAccountValue')"
                     }
                     else {
-                        $whereClause = $whereClause + " OR ([attributeName] = '$crossCheckSystemFieldName' AND [attributeValue] = '$fieldToCheckAccountValue')"
+                        $whereClause = $whereClause + " OR ([attributeName] = '$crossCheckSystemFieldName' AND [attributeValue] = '$sqlAccountValue')"
                     }
                 }
             }
@@ -572,21 +575,26 @@ try {
         $filter = $null
         if ($fieldToCheck.Value.systemFieldName -eq 'proxyAddresses') {
             foreach ($fieldToCheckAccountValue in $fieldToCheck.Value.accountValue) {
+                # Escape single quotes to prevent filter errors and injection for values like "in 't veld"
+                $entraIdAccountValue = "$fieldToCheckAccountValue".Replace("'", "''")
+
                 if ($null -eq $filter) {
-                    $filter = "$($fieldToCheck.Value.systemFieldName)/any(c:c eq '$($fieldToCheckAccountValue)')" 
+                    $filter = "$($fieldToCheck.Value.systemFieldName)/any(c:c eq '$($entraIdAccountValue)')" 
                 }
                 else {
-                    $filter = $filter + " OR $($fieldToCheck.Value.systemFieldName)/any(c:c eq '$($fieldToCheckAccountValue)')"
+                    $filter = $filter + " OR $($fieldToCheck.Value.systemFieldName)/any(c:c eq '$($entraIdAccountValue)')"
                 }
             }
         }
         else {
-            $filter = "$($fieldToCheck.Value.systemFieldName) eq '$($fieldToCheck.Value.accountValue)'" 
+            $entraIdAccountValue = "$($fieldToCheck.Value.accountValue)".Replace("'", "''")
+            $filter = "$($fieldToCheck.Value.systemFieldName) eq '$($entraIdAccountValue)'" 
         }
 
         if (@($fieldToCheck.Value.crossCheckOn).Count -ge 1) {
+            $crossCheckEntraIdAccountValue = "$($fieldToCheck.Value.accountValue)".Replace("'", "''")
             foreach ($fieldToCrossCheckOn in $fieldToCheck.Value.crossCheckOn) {
-                $filter = $filter + " OR $($fieldToCrossCheckOn) eq '$($fieldToCheck.Value.accountValue)'"
+                $filter = $filter + " OR $($fieldToCrossCheckOn) eq '$($crossCheckEntraIdAccountValue)'"
             }
         }
 
