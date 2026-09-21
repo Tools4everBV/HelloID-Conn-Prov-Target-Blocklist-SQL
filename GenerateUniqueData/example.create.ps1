@@ -1,5 +1,5 @@
-#####################################################
-# HelloID-Conn-Prov-Target-Blacklist-Create-SQL-Unique
+﻿#####################################################
+# HelloID-Conn-Prov-Target-Blocklist-Create-SQL-Unique
 #
 #####################################################
 # Initialize default values
@@ -154,7 +154,7 @@ try {
         # Format input range to specified amount of chars, prefix and/or suffix
         $inputRange = $inputRange | ForEach-Object { "$prefix{0:d$amountOfChars}$suffix" -f $_ }
 
-        Write-Information "Generating random value between [$($inputRange[0])] and [$($inputRange[-1])] that doesn't exist in blacklist"
+        Write-Information "Generating random value between [$($inputRange[0])] and [$($inputRange[-1])] that doesn't exist in blocklist"
 
         $currentValues = $querySelectResult."$($column)" | Sort-Object
         $excludeRange = $currentValues
@@ -169,7 +169,7 @@ try {
         # Set SamAccountName of Account object with generated unique value
         $account.SamAccountName = $uniqueValue
 
-        Write-Information "Successfully generated random value between [$($inputRange[0])] and [$($inputRange[-1])] that doesn't exist in blacklist: [$($uniqueValue)]"
+        Write-Information "Successfully generated random value between [$($inputRange[0])] and [$($inputRange[-1])] that doesn't exist in blocklist: [$($uniqueValue)]"
     }
     catch {
         $ex = $PSItem
@@ -181,7 +181,7 @@ try {
         Write-Information "Error at Line [$($ex.InvocationInfo.ScriptLineNumber)]: $($ex.InvocationInfo.Line). Error: $($verboseErrorMessage)"
         $auditLogs.Add([PSCustomObject]@{
                 # Action  = "" # Optional
-                Message = "Error generating random value between [$($inputRange[0])] and [$($inputRange[-1])] that doesn't exist in blacklist. Error Message: $auditErrorMessage"
+                Message = "Error generating random value between [$($inputRange[0])] and [$($inputRange[-1])] that doesn't exist in blocklist. Error Message: $auditErrorMessage"
                 IsError = $True
             })
 
@@ -189,7 +189,7 @@ try {
         continue
     }
 
-    # Update blacklist database
+    # Update blocklist database
     try {
         # Enclose Property Names with brackets []
         $queryInsertProperties = $("[" + ($account.PSObject.Properties.Name -join "],[") + "]")

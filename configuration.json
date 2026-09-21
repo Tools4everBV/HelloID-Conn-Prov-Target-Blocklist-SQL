@@ -6,7 +6,7 @@
     "templateOptions": {
       "label": "Connection string",
       "placeholder": "Server=<server>;Database=<database>;Integrated Security=True;",
-      "description": "The connection string used to connect to the SQL database",
+      "description": "For Azure SQL authentication, use the following format:\nServer=<server>.database.windows.net,1433;Database=<database>;Encrypt=True;TrustServerCertificate=False;Connection Timeout=25;",
       "required": true
     }
   },
@@ -16,8 +16,19 @@
     "defaultValue": "",
     "templateOptions": {
       "label": "Table",
-      "placeholder": "blacklist",
-      "description": "The table in which the blacklist values reside",
+      "placeholder": "blocklist",
+      "description": "The table in which the blocklist values reside",
+      "required": true
+    }
+  },
+  {
+    "key": "retentionPeriod",
+    "type": "input",
+    "defaultValue": "365",
+    "templateOptions": {
+      "label": "Retention Period (days)",
+      "placeholder": "365",
+      "description": "The number of days a deleted value should remain blocked. After this period, the value can be reused. Use 999999 for no retention limit.",
       "required": true
     }
   },
@@ -45,14 +56,57 @@
     }
   },
   {
-    "key": "retentionPeriod",
-    "type": "input",
-    "defaultValue": "365",
+    "defaultValue": false,
+    "key": "azureSqlAuthentication",
     "templateOptions": {
-      "label": "Retention Period (days)",
-      "placeholder": "365",
-      "description": "The number of days a deleted value should remain blocked. After this period, the value can be reused. Use 999999 for no retention limit.",
-      "required": true
+      "description": "When toggled, the connection will use a certificate to retrieve an access token for Azure SQL authentication. When disabled, the connection will use the provided username and password for local SQL authentication.",
+      "label": "Use Azure SQL authentication",
+      "required": false
+    },
+    "type": "checkbox"
+  },
+  {
+    "key": "azureSqlTenantID",
+    "type": "input",
+    "defaultValue": "",
+    "templateOptions": {
+      "label": "App Registration Directory (tenant) ID",
+      "placeholder": "00000000-0000-0000-0000-000000000000",
+      "description": "",
+      "required": false
+    }
+  },
+  {
+    "key": "azureSqlAppId",
+    "type": "input",
+    "defaultValue": "",
+    "templateOptions": {
+      "label": "App Registration Application (client) ID",
+      "placeholder": "00000000-0000-0000-0000-000000000000",
+      "description": "",
+      "required": false
+    }
+  },
+  {
+    "key": "azureSqlAppCertificateBase64String",
+    "type": "input",
+    "defaultValue": "",
+    "templateOptions": {
+      "label": "App Registration Certificate Base 64 String",
+      "type": "password",
+      "placeholder": "WFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFg==",
+      "required": false
+    }
+  },
+  {
+    "key": "azureSqlAppCertificatePassword",
+    "type": "input",
+    "defaultValue": "",
+    "templateOptions": {
+      "label": "App Registration Certificate Password",
+      "type": "password",
+      "placeholder": "P@ssw0rd!",
+      "required": false
     }
   }
 ]

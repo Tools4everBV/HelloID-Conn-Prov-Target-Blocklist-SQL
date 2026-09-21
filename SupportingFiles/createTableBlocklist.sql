@@ -1,4 +1,4 @@
-USE Blacklist
+﻿USE Blocklist
 GO
 
 SET ANSI_NULLS ON
@@ -7,7 +7,7 @@ GO
 SET QUOTED_IDENTIFIER ON
 GO
 
-CREATE TABLE [dbo].[blacklist](
+CREATE TABLE [dbo].[blocklist](
 	[attributeName] [nvarchar](50) NOT NULL,
 	[attributeValue] [nvarchar](255) NOT NULL,
 	[employeeId] [nvarchar](50) NULL,
@@ -17,7 +17,7 @@ CREATE TABLE [dbo].[blacklist](
 ) ON [PRIMARY]
 GO
 
-CREATE NONCLUSTERED INDEX [IX_blacklist] ON [dbo].[blacklist]
+CREATE NONCLUSTERED INDEX [IX_blocklist] ON [dbo].[blocklist]
 (
 	[attributeName] ASC,
 	[attributeValue] ASC
@@ -27,7 +27,7 @@ GO
 SET ANSI_PADDING ON
 GO
 
-CREATE NONCLUSTERED INDEX [IX_blacklist_1] ON [dbo].[blacklist]
+CREATE NONCLUSTERED INDEX [IX_blocklist_1] ON [dbo].[blocklist]
 (
 	[attributeValue] ASC
 )WITH (PAD_INDEX = OFF, STATISTICS_NORECOMPUTE = OFF, SORT_IN_TEMPDB = OFF, DROP_EXISTING = OFF, ONLINE = OFF, ALLOW_ROW_LOCKS = ON, ALLOW_PAGE_LOCKS = ON, OPTIMIZE_FOR_SEQUENTIAL_KEY = OFF) ON [PRIMARY]
@@ -36,7 +36,7 @@ GO
 SET ANSI_PADDING ON
 GO
 
-CREATE NONCLUSTERED INDEX [IX_blacklist_2] ON [dbo].[blacklist]
+CREATE NONCLUSTERED INDEX [IX_blocklist_2] ON [dbo].[blocklist]
 (
 	[employeeId] ASC
 )
