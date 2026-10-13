@@ -280,12 +280,8 @@ try {
 
                 "WhenDeletedAlreadySet" {
                     $actionMessage = "skipping updating row in table [$table] where [$($attributeName)] = [$($dbCurrentRow.attributeValue)] AND [employeeID] = [$($actionContext.References.Account)]"
-
-                    $outputContext.auditlogs.Add([PSCustomObject]@{
-                            # Action  = "" # Optional
-                            Message = "Skipped updating row in table [$table] where [$($attributeName)] = [$($dbCurrentRow.attributeValue)] AND [employeeID] = [$($actionContext.References.Account)]. reason: [whenDeleted] is already set."
-                            IsError = $false
-                        })
+                   
+                    write-information "$actionMessage"
 
                     break
                 }

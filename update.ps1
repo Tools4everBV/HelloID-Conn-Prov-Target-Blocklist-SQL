@@ -389,11 +389,7 @@ try {
                 $outputContext.PreviousData | Add-Member -NotePropertyName $attributeName -NotePropertyValue $correlatedAccount.attributeValue -Force
                 $outputContext.Data | Add-Member -NotePropertyName $attributeName -NotePropertyValue $correlatedAccount.attributeValue -Force
 
-                $outputContext.auditlogs.Add([PSCustomObject]@{
-                        # Action  = "" # Optional
-                        Message = "Skipped updating row in table [$table] where [$($attributeName)] = [$($actionContext.Data.$attributeName)] AND [employeeID] = [$($actionContext.References.Account)]. reason: No changes."
-                        IsError = $false
-                    })
+                write-information "$actionMessage"
 
                 break
             }

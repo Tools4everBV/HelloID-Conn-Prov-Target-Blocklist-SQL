@@ -378,13 +378,7 @@ try {
                 $actionMessage = "skipping updating row in table [$table] where [$($attributeName)] = [$($actionContext.Data.$attributeName)] AND [employeeID] = [$($actionContext.Data.employeeId)]"
 
                 $outputContext.Data | Add-Member -NotePropertyName $attributeName -NotePropertyValue $correlatedAccount.attributeValue -Force
-
-                $outputContext.auditlogs.Add([PSCustomObject]@{
-                        # Action  = "" # Optional
-                        Message = "Skipped updating row in table [$table] where [$($attributeName)] = [$($actionContext.Data.$attributeName)] AND [employeeID] = [$($actionContext.Data.employeeId)]. reason: No changes."
-                        IsError = $false
-                    })
-
+                write-information "$actionMessage"
                 break
             }
 
