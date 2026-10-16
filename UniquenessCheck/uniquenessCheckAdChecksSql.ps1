@@ -1,5 +1,5 @@
 #########################################################################
-# HelloID-Conn-Prov-Target-Blocklist-Check-On-External-Systems-AD-SQL
+# HelloID-Conn-Prov-Target-Blocklist-Check-On-External-Systems-SQL
 #########################################################################
 
 # Initialize default properties
