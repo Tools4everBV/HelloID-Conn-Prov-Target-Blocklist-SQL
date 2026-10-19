@@ -203,6 +203,11 @@ try {
     }
 
     foreach ($attributeName in $attributeNames) {
+        if ([string]::IsNullOrWhiteSpace($actionContext.Data.$attributeName)) {
+            $actionMessage = "validating attribute [$attributeName]"
+            throw "Attribute [$attributeName] must not be null, empty or whitespace."
+        }
+
         # Check if attribute is in table
         $actionMessage = "querying row in table [$table] where [$($attributeName)] = [$($actionContext.Data.$attributeName)]"
 
