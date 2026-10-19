@@ -81,15 +81,15 @@ $fieldsToCheck = [PSCustomObject]@{
     "sAMAccountName"    = [PSCustomObject]@{
         systemFieldName = 'sAMAccountName'
         accountValue    = $a.sAMAccountName
-        keepInSyncWith  = @("commonName")
+        keepInSyncWith  = $null
         crossCheckOn    = $null
     }
-    "commonName"        = [PSCustomObject]@{
-        systemFieldName = 'cn'
-        accountValue    = $a.commonName
-        keepInSyncWith  = @("sAMAccountName")
-        crossCheckOn    = $null
-    }
+    # "commonName"        = [PSCustomObject]@{
+    #     systemFieldName = 'cn'
+    #     accountValue    = $a.commonName
+    #     keepInSyncWith  = @("sAMAccountName")
+    #     crossCheckOn    = $null
+    # }
 }
 #endregion Change mapping here
 
