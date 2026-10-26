@@ -219,6 +219,11 @@ try {
         $querySelectResult = [System.Collections.ArrayList]::new()
         Invoke-SQLQuery @querySelectSplatParams -Data ([ref]$querySelectResult) -verbose:$false
 
+        if ([string]::IsNullOrWhiteSpace($actionContext.Data.$attributeName)) {
+            $actionMessage = "validating attribute [$attributeName]"
+            throw "Attribute [$attributeName] must not be null, empty or whitespace."
+        }
+
         $selectRowCount = ($querySelectResult | Measure-Object).count
         Write-Information "Queried data FROM [$table] WHERE [attributeName] = '$attributeName' AND [attributeValue] = '$attributeValue'. Result count: $selectRowCount"
 

@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. The format is based on [Keep a Changelog](https://keepachangelog.com/), and this project adheres to [Semantic Versioning](https://semver.org/).
 
+
+## [2.2.1] - 2026-10-16
+
+### Fixed
+
+- Reject null, empty, or whitespace-only attribute values in `create.ps1` and `update.ps1` with an attribute-specific audit error, preventing empty values from being stored in the blocklist.
+
 ## [2.2.0] - 2026-08-03
 
 ### Added
