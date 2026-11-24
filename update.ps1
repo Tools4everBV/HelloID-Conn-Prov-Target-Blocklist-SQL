@@ -202,6 +202,13 @@ try {
         throw "The account reference could not be found"
     }
 
+    # Validate all attributes before writing anything to the blocklist
+    $actionMessage = "validating attributes"
+    $emptyAttributes = $attributeNames | Where-Object { [string]::IsNullOrWhiteSpace($actionContext.Data.$_) }
+    if ($emptyAttributes) {
+        throw "Attribute(s) [$($emptyAttributes -join ', ')] must not be null, empty or whitespace."
+    }
+
     foreach ($attributeName in $attributeNames) {
         # Check if attribute is in table
         $actionMessage = "querying row in table [$table] where [$($attributeName)] = [$($actionContext.Data.$attributeName)]"
@@ -221,11 +228,6 @@ try {
         
         $querySelectResult = [System.Collections.ArrayList]::new()
         Invoke-SQLQuery @querySelectSplatParams -Data ([ref]$querySelectResult) -verbose:$false
-
-        if ([string]::IsNullOrWhiteSpace($actionContext.Data.$attributeName)) {
-            $actionMessage = "validating attribute [$attributeName]"
-            throw "Attribute [$attributeName] must not be null, empty or whitespace."
-        }
 
         $selectRowCount = ($querySelectResult | measure-object).count
         Write-Verbose "Queried data FROM [$table] WHERE [attributeName] = '$attributeName' AND [attributeValue] = '$attributeValue'. Result count: $selectRowCount"
