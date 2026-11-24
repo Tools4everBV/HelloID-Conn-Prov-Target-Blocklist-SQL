@@ -199,6 +199,13 @@ try {
         $accessToken = $null
     }
 
+    # Validate all attributes before writing anything to the blocklist
+    $actionMessage = "validating attributes"
+    $emptyAttributes = $attributeNames | Where-Object { [string]::IsNullOrWhiteSpace($actionContext.Data.$_) }
+    if ($emptyAttributes) {
+        throw "Attribute(s) [$($emptyAttributes -join ', ')] must not be null, empty or whitespace."
+    }
+
     foreach ($attributeName in $attributeNames) {
         # Check if attribute is in table
         $actionMessage = "querying row in table [$table] where [$($attributeName)] = [$($actionContext.Data.$attributeName)]"
